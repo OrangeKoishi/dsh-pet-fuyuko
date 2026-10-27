@@ -1,0 +1,30 @@
+{
+  "id": "fuyuko",
+  "name": "黛冬优子",
+  "nameEn": "Fuyuko Mayuzumi",
+  "version": "0.1.0",
+  "anchor": "bottom-center",
+  "canvas": 512,
+  "scale": 1,
+  "assets": {
+    "base": "fuyuko.png",
+    "optional": {}
+  },
+  "motions": {
+    "idle": { "kind": "css", "preset": "breathe" },
+    "curious": { "kind": "css", "preset": "breathe" },
+    "talk": { "kind": "css", "preset": "breathe" },
+    "think": { "kind": "css", "preset": "float" },
+    "work": { "kind": "css", "preset": "sway" },
+    "panic": { "kind": "css", "preset": "shake" },
+    "sleepy": { "kind": "css", "preset": "sink" },
+    "worried": { "kind": "css", "preset": "breathe" },
+    "pout": { "kind": "css", "preset": "breathe" },
+    "dragged": { "kind": "css", "preset": "none" }
+  },
+  "hotspots": [
+    { "id": "ahoge", "x": 0.5, "y": 0.06, "w": 0.22, "h": 0.14, "cursor": "pointer" },
+    { "id": "body", "x": 0.5, "y": 0.55, "w": 0.8, "h": 0.85, "cursor": "pointer" }
+  ],
+  "_note": "后续加表情：把 fuyuko-<state>.png 放进本目录，在 assets.optional 里加一行即可，代码不用改。帧动画留了 motions.<state> = {kind:'frames', ...} 的位置（二期）。"
+}

@@ -1,0 +1,13 @@
+# Overlay patch for the pet plugin — point `dsh web --patch` at this file, or
+# copy the `insert:` block into your profile's own cordis.patch.yml.
+#
+# Replace the path below with wherever you cloned this repo (Windows paths look
+# like file:///D:/projects/dsh-pet-fuyuko/lib/index.js).
+#
+# The row name is a `file:` URL because the plugin lives outside any
+# node_modules tree. The Loader imports the URL as ESM, and client-modules
+# locates package.json by walking up from that module, so `dsh.client` is found
+# and the browser bundle is served from the same package.
+- insert:
+    - id: pet-fuyuko
+      name: 'file:///path/to/dsh-pet-fuyuko/lib/index.js'

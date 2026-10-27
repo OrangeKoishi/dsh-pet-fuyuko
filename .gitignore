@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Test/browser scratch
+*.log
+edge-profile/
+.pwsh-*/
+
+# Local screenshots from tools/shot-live.mjs
+live-shot.png
+out.png
+
+# OS
+Thumbs.db
+.DS_Store

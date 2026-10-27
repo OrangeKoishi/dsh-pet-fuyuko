@@ -1,0 +1,35 @@
+{
+  "name": "dsh-pet-fuyuko",
+  "version": "0.1.0",
+  "private": true,
+  "description": "黛冬优子桌宠 — DeepSeek Harness Web GUI 的客户端浮层插件",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "test": "node test/asset-route.test.mjs && node test/client-face.test.mjs && node test/live-server.test.mjs && node test/packaging.test.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "desktop-pet"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OrangeKoishi/dsh-pet-fuyuko.git"
+  },
+  "license": "MIT"
+}
