@@ -2,6 +2,8 @@
 
 黛冬优子桌宠 —— DeepSeek Harness Web GUI 的客户端浮层插件。
 
+![preview](docs/preview.png)
+
 > 当前状态：**M0（骨架）已完成并在真实 GUI 上跑通**，见 [M0-STATUS.md](M0-STATUS.md)。
 > 设计稿：[DESIGN.md](DESIGN.md) · 素材验收：[ASSET-REVIEW.md](ASSET-REVIEW.md)
 
