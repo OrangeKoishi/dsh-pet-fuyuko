@@ -183,6 +183,10 @@
     <script>
       const hud = document.getElementById("hud");
       const overlay = document.getElementById("overlay");
+      // The HUD is diagnostic text; hide it unless the URL asks for it so the
+      // same page can produce a clean screenshot for the README.
+      const showHud = new URLSearchParams(location.search).has("hud");
+      if (!showHud) hud.style.display = "none";
       window.__harness.mount(overlay, window.__petMod);
       // The component fetches pet.json before rendering; report once it appears.
       let tries = 0;
