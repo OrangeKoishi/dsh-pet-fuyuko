@@ -146,6 +146,28 @@
 优先级：`drag > talk > panic > sleep > working > thinking > curious > idle`。
 表情一律被打断后**回到基线 idle**，不叠 buff。
 
+#### 3.2.1 M1 已实现的部分
+
+一期只做四个状态，全部由**真实会话事实**驱动（不是计时器假装）：
+
+| 状态 | 判据（按优先级） | 视觉 |
+|---|---|---|
+| `panic` | `session.lastAgentError` 非空 | 抖动 + 错误摘要 |
+| `work` | `chat.legacy.runningCalls.length > 0` | 左右摇摆 |
+| `think` | `chat.legacy.partial` 存在（正在流式输出） | 上浮 + 三点 |
+| `idle` | 以上都不成立 | 呼吸 |
+
+`curious / talk / sleep / worried` 留到 M2（需要台词与心情值）。
+
+**跨作用域的实现**：桌宠在 `shell.overlay`（root scope），而 `useChat` / `useSession`
+只在 session scope 存在 —— 两者是不同的 React 树，不能共享 context。做法是一个
+**渲染 `null` 的桥接组件**挂在 `conversation.input.overlay`（session scope），把粗粒度
+活动状态发布进一个模块级 store，桌宠用 `useSyncExternalStore` 订阅。
+
+store 只存**粗粒度标志**（activity / sessionId / since / toolCalls / errorText），
+不存任何消息内容；相同值重复发布会跳过通知，避免每个 chat 事件都重渲染。
+
+
 ### 3.3 点击互动
 
 | 手势 | 行为 |

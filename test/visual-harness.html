@@ -97,6 +97,22 @@
               const cleanup = fn();
               slots[i] = typeof cleanup === "function" ? cleanup : null;
             });
+          },
+          /**
+           * Real subscription: re-render whenever the store notifies, so the
+           * harness exercises the same path useSyncExternalStore would take.
+           */
+          useSyncExternalStore(subscribe, getSnapshot) {
+            const i = cursor++;
+            if (!(i in slots)) {
+              slots[i] = { value: getSnapshot() };
+              const record = slots[i];
+              record.unsubscribe = subscribe(() => {
+                record.value = getSnapshot();
+                schedule();
+              });
+            }
+            return slots[i].value;
           }
         };
 
@@ -188,6 +204,17 @@
       const showHud = new URLSearchParams(location.search).has("hud");
       if (!showHud) hud.style.display = "none";
       window.__harness.mount(overlay, window.__petMod);
+
+      // Drive the real signal store the way the session bridge would, so the
+      // pet's subscription path is exercised without a live conversation.
+      // `?activity=think` sets the initial state; the console helpers below
+      // switch it at runtime.
+      const initialActivity = new URLSearchParams(location.search).get("activity");
+      const signal = window.__petMod.__test;
+      if (initialActivity) signal.publishSignal({ activity: initialActivity, sessionId: "harness" });
+      window.petActivity = (name) => signal.publishSignal({ activity: name, sessionId: "harness" });
+      window.petClear = () => signal.clearSignal();
+      window.petSignal = () => signal.getSignal();
       // The component fetches pet.json before rendering; report once it appears.
       let tries = 0;
       const timer = setInterval(() => {

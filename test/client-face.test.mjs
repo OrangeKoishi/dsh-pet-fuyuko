@@ -84,6 +84,11 @@ function makeFakeReact() {
     useEffect(fn) {
       cursor++;
     },
+    useSyncExternalStore(subscribe, getSnapshot) {
+      // The fake never re-renders, so it only has to return a current value.
+      cursor++;
+      return getSnapshot();
+    },
     createElement(type, props, ...children) {
       return { type, props: props ?? {}, children: children.flat() };
     }
@@ -113,7 +118,7 @@ assert.match(styleTags[0].textContent, /dpf-pet/, "css carries the pet rules");
 assert.match(styleTags[0].textContent, /prefers-reduced-motion/, "css honours reduced motion");
 assert.match(styleTags[0].textContent, /dpf-breathe/, "css carries the idle motion");
 
-// ── apply() registers into shell.overlay ──────────────────────────────────
+// ── apply() registers the pet and the invisible bridge ────────────────────
 const registrations = [];
 const injected = [];
 const ctx = {
@@ -129,12 +134,23 @@ const ctx = {
   }
 };
 mod.apply(ctx);
-assert.deepEqual(injected, ["shell.overlay"], "must wait for the overlay slot");
-assert.equal(registrations.length, 1, "one registration");
-assert.equal(registrations[0].spec.name, "shell.overlay");
-assert.equal(registrations[0].spec.id, "pet-fuyuko");
-assert.equal(registrations[0].spec.order, 50);
-assert.equal(typeof registrations[0].component, "function");
+assert.deepEqual(
+  injected,
+  ["shell.overlay", "conversation.input.overlay"],
+  "pet in the frame overlay, bridge in a session-scoped slot"
+);
+assert.equal(registrations.length, 2, "two registrations");
+
+const pet = registrations.find((r) => r.spec.id === "pet-fuyuko");
+const bridge = registrations.find((r) => r.spec.id === "pet-fuyuko-bridge");
+assert.ok(pet, "pet registration exists");
+assert.ok(bridge, "bridge registration exists");
+assert.equal(pet.spec.name, "shell.overlay");
+assert.equal(pet.spec.order, 50);
+assert.equal(bridge.spec.name, "conversation.input.overlay");
+assert.equal(typeof pet.component, "function");
+assert.equal(typeof bridge.component, "function");
+assert.equal(mod.SessionBridge, bridge.component, "bridge is exported for tests");
 
 // ── first render: hidden until the manifest probe confirms the route ──────
 fake.reset();
@@ -220,5 +236,81 @@ const stepUp = 1 * (1 - -100 * ZOOM_RATE);
 const stepDown = 1 * (1 - 100 * ZOOM_RATE);
 assert.ok(stepUp > 1, "wheel up enlarges");
 assert.ok(stepDown < 1, "wheel down shrinks");
+
+// ── M1: activity derivation from live session facts ───────────────────────
+const { deriveActivity, publishSignal, clearSignal, getSignal, subscribeSignal, ACTIVITY, EMPTY_SIGNAL } = mod.__test;
+
+/** Build a minimal chat snapshot with the two fields the pet reads. */
+const chat = ({ runningCalls = [], partial = null } = {}) => ({
+  legacy: { runningCalls, partial }
+});
+const sess = ({ lastAgentError = null } = {}) => ({ lastAgentError });
+
+// Idle: nothing running, nothing streaming.
+assert.deepEqual(deriveActivity(chat(), sess()), {
+  activity: ACTIVITY.IDLE,
+  toolCalls: 0,
+  errorText: ""
+});
+
+// Thinking: a streaming assistant prefix with no tool in flight.
+assert.equal(deriveActivity(chat({ partial: { turn: 1, step: 1, blocks: [] } }), sess()).activity, ACTIVITY.THINKING);
+
+// Working: at least one running tool call, and the count is reported.
+const twoCalls = deriveActivity(
+  chat({ runningCalls: [{ callId: "a", name: "fs_read", argsRaw: "{}" }, { callId: "b", name: "pwsh", argsRaw: "{}" }] }),
+  sess()
+);
+assert.equal(twoCalls.activity, ACTIVITY.WORKING);
+assert.equal(twoCalls.toolCalls, 2);
+
+// A tool call outranks a streaming prefix: "working" is more specific.
+assert.equal(
+  deriveActivity(chat({ runningCalls: [{ callId: "a" }], partial: { turn: 1, step: 1, blocks: [] } }), sess()).activity,
+  ACTIVITY.WORKING
+);
+
+// Error outranks everything, and the message is carried through.
+const failed = deriveActivity(chat({ runningCalls: [{ callId: "a" }] }), sess({ lastAgentError: "429 rate limited" }));
+assert.equal(failed.activity, ACTIVITY.ERROR);
+assert.equal(failed.errorText, "429 rate limited");
+
+// Absent or malformed inputs must not throw — the pet renders before a session binds.
+assert.equal(deriveActivity(undefined, undefined).activity, ACTIVITY.IDLE);
+assert.equal(deriveActivity(null, null).activity, ACTIVITY.IDLE);
+assert.equal(deriveActivity({}, {}).activity, ACTIVITY.IDLE);
+assert.equal(deriveActivity({ legacy: {} }, {}).activity, ACTIVITY.IDLE);
+assert.equal(deriveActivity({ legacy: { runningCalls: "nope" } }, {}).toolCalls, 0, "non-array → 0");
+
+// ── M1: the signal store ──────────────────────────────────────────────────
+clearSignal();
+assert.equal(getSignal(), EMPTY_SIGNAL, "cleared signal is the shared empty value");
+
+let notifications = 0;
+const unsubscribe = subscribeSignal(() => {
+  notifications += 1;
+});
+
+publishSignal({ activity: ACTIVITY.THINKING, sessionId: "s1", since: 111 });
+assert.equal(notifications, 1, "a real change notifies");
+assert.equal(getSignal().activity, ACTIVITY.THINKING);
+assert.equal(getSignal().sessionId, "s1");
+
+// Republishing identical values must NOT notify (useSyncExternalStore would
+// otherwise re-render on every chat event).
+publishSignal({ activity: ACTIVITY.THINKING, sessionId: "s1", since: 111 });
+assert.equal(notifications, 1, "identical publish is a no-op");
+
+publishSignal({ activity: ACTIVITY.WORKING, toolCalls: 3 });
+assert.equal(notifications, 2, "changed activity notifies");
+assert.equal(getSignal().toolCalls, 3);
+assert.equal(getSignal().sessionId, "s1", "unspecified fields are preserved");
+
+unsubscribe();
+publishSignal({ activity: ACTIVITY.IDLE });
+assert.equal(notifications, 2, "unsubscribed listener is not called");
+
+clearSignal();
+assert.equal(getSignal(), EMPTY_SIGNAL, "clear resets to the shared empty value");
 
 console.log("client-face: all checks passed");
