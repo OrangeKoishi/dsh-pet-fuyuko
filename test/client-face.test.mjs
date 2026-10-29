@@ -313,4 +313,40 @@ assert.equal(notifications, 2, "unsubscribed listener is not called");
 clearSignal();
 assert.equal(getSignal(), EMPTY_SIGNAL, "clear resets to the shared empty value");
 
+// ── M2: the persona surface is part of the bundle's test face ─────────────
+// These are the pure pieces the persona work is built from; the behavioural
+// assertions live in lines.test.mjs, this just pins the contract.
+for (const name of [
+	"normalizeLibrary",
+	"pickLine",
+	"applyVars",
+	"matchesSchedule",
+	"summarizeError",
+	"bubbleMs",
+	"defaultPetState",
+	"sanitizePetState",
+	"readPetState",
+	"writePetState",
+	"deriveSpriteState",
+	"shouldSleep",
+	"hitHotspot",
+	"placeBubble",
+	"placeMenu",
+	"menuItemsFor",
+	"cycleFor",
+	"resetCycles"
+]) {
+	assert.equal(typeof mod.__test[name], "function", `__test.${name} must be exposed`);
+}
+assert.equal(mod.__test.MODE.OMOTE, "omote");
+assert.equal(mod.__test.MODE.URA, "ura");
+
+// The M1 debug override moved off the shared state key so it can never clobber
+// the persona blob; that separation is a real contract, not a detail.
+assert.equal(typeof mod.__test.readDebugState, "function");
+window.localStorage.setItem("dsh-pet-fuyuko:debug-state", "panic");
+assert.equal(mod.__test.readDebugState(), "panic");
+window.localStorage._v.delete("dsh-pet-fuyuko:debug-state");
+assert.equal(mod.__test.readDebugState(), undefined);
+
 console.log("client-face: all checks passed");

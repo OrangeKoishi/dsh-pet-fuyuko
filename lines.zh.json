@@ -81,6 +81,11 @@
     { "id": "click.omote.13", "kind": "click", "mode": "omote", "emotion": "smile", "text": "手指会累的吧，我帮你吹吹。" },
     { "id": "click.omote.14", "kind": "click", "mode": "omote", "emotion": "pout", "text": "太频繁了啦！……不过也没关系。" },
     { "id": "click.omote.15", "kind": "click", "mode": "omote", "emotion": "smile", "text": "你笑起来的样子，比刚才好看多了。" },
+    { "id": "click.omote.16", "kind": "click", "mode": "omote", "emotion": "blush", "text": "我刚才一直在看你打字……啊、没有别的意思！" },
+    { "id": "click.omote.17", "kind": "click", "mode": "omote", "emotion": "curious", "text": "手指敲得这么快，是在写很重要的东西吧？" },
+    { "id": "click.omote.18", "kind": "click", "mode": "omote", "emotion": "smile", "text": "要不要我数三下，你就休息一下？一、二……" },
+    { "id": "click.omote.19", "kind": "click", "mode": "omote", "emotion": "blush", "text": "被你碰到的地方，好像会记得很久。" },
+    { "id": "click.omote.20", "kind": "click", "mode": "omote", "emotion": "smile", "text": "今天也辛苦了。这句话我想说很多遍。" },
 
     { "id": "click.ura.01", "kind": "click", "mode": "ura", "emotion": "pout", "text": "……干嘛。" },
     { "id": "click.ura.02", "kind": "click", "mode": "ura", "emotion": "pout", "text": "别戳。很痒。" },
@@ -97,6 +102,11 @@
     { "id": "click.ura.13", "kind": "click", "mode": "ura", "emotion": "pout", "text": "你手真闲。" },
     { "id": "click.ura.14", "kind": "click", "mode": "ura", "emotion": "blush", "text": "……偶尔这样，也不讨厌。" },
     { "id": "click.ura.15", "kind": "click", "mode": "ura", "emotion": "idle", "text": "行了。继续吧，我陪着。" },
+    { "id": "click.ura.16", "kind": "click", "mode": "ura", "emotion": "pout", "text": "……看够了没有。手放下来。" },
+    { "id": "click.ura.17", "kind": "click", "mode": "ura", "emotion": "idle", "text": "敲那么多字，手指不会抽筋？" },
+    { "id": "click.ura.18", "kind": "click", "mode": "ura", "emotion": "pout", "text": "我在这儿是看你干活的，不是给你点着玩的。" },
+    { "id": "click.ura.19", "kind": "click", "mode": "ura", "emotion": "blush", "text": "……知道了。别一直摸。" },
+    { "id": "click.ura.20", "kind": "click", "mode": "ura", "emotion": "idle", "text": "嗯。累了就说，我又不会笑你。" },
 
     { "id": "ahoge.omote.01", "kind": "ahoge", "mode": "omote", "emotion": "panic", "text": "呀！那、那里不能碰啦！" },
     { "id": "ahoge.omote.02", "kind": "ahoge", "mode": "omote", "emotion": "pout", "text": "呆毛会翘起来的……真的会翘的哦。" },

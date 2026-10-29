@@ -9,7 +9,7 @@ import { apply } from "../lib/index.js";
 
 /** Minimal fake of ctx.inject + ctx.effect + ctx.webServer. */
 function makeCtx() {
-  let route;
+  const routes = [];
   const ctx = {
     inject(_names, cb) {
       cb(ctx);
@@ -19,14 +19,17 @@ function makeCtx() {
     },
     webServer: {
       register(r) {
-        route = r;
+        routes.push(r);
         return () => {
-          route = undefined;
+          const i = routes.indexOf(r);
+          if (i >= 0) routes.splice(i, 1);
         };
       }
     }
   };
-  return { ctx, getRoute: () => route };
+  /** @param {string} path - exact or prefix path to look up. */
+  const find = (path) => routes.find((r) => r.path === path);
+  return { ctx, getRoute: () => find("/pet-fuyuko/asset"), getRoutes: () => routes };
 }
 
 /** Minimal fake ServerResponse collecting status/headers/body. */
@@ -65,12 +68,17 @@ async function request(route, url, method = "GET") {
   return res;
 }
 
-const { ctx, getRoute } = makeCtx();
+const { ctx, getRoute, getRoutes } = makeCtx();
 apply(ctx);
 const route = getRoute();
 assert.ok(route, "route must be registered when a web server is present");
 assert.equal(route.kind, "prefix");
 assert.equal(route.path, "/pet-fuyuko/asset");
+
+// The lines route is a separate exact route, not a widening of the asset root.
+const linesRoute = getRoutes().find((r) => r.path === "/pet-fuyuko/lines.zh.json");
+assert.ok(linesRoute, "lines route must be registered");
+assert.equal(linesRoute.kind, "exact", "lines route is an exact path, not a prefix");
 
 // 1. pet.json is served as JSON
 let res = await request(route, "/pet-fuyuko/asset/fuyuko/pet.json");
@@ -110,5 +118,34 @@ assert.equal(res.headers.allow, "GET, HEAD");
 res = await request(route, "/pet-fuyuko/asset/fuyuko/fuyuko.png", "HEAD");
 assert.equal(res.status, 200);
 assert.equal(res.body().length, 0, "HEAD must not stream a body");
+
+// 7. the lines library is served, and is valid JSON with the expected shape
+res = await request(linesRoute, "/pet-fuyuko/lines.zh.json");
+assert.equal(res.status, 200, "lines should be 200");
+assert.match(res.headers["content-type"], /application\/json/);
+const lines = JSON.parse(res.body().toString("utf8"));
+assert.ok(Array.isArray(lines.lines) && lines.lines.length > 0, "lines carry entries");
+assert.ok(lines.lines.every((l) => typeof l.id === "string" && typeof l.text === "string"), "each line has id + text");
+
+// 8. the lines route only answers its exact path — it must not become a file
+//    server for the package root (e.g. package.json or the credentials-adjacent
+//    files next to it).
+for (const evil of [
+  "/pet-fuyuko/package.json",
+  "/pet-fuyuko/lines.zh.json/../package.json",
+  "/pet-fuyuko/../package.json"
+]) {
+  const r2 = await request(linesRoute, evil);
+  assert.equal(r2.status, 404, `${evil} must not be served by the lines route`);
+}
+
+// 9. HEAD on the lines route: headers, no body
+res = await request(linesRoute, "/pet-fuyuko/lines.zh.json", "HEAD");
+assert.equal(res.status, 200);
+assert.equal(res.body().length, 0);
+
+// 10. non-GET on the lines route is rejected too
+res = await request(linesRoute, "/pet-fuyuko/lines.zh.json", "POST");
+assert.equal(res.status, 405);
 
 console.log("asset-route: all checks passed");

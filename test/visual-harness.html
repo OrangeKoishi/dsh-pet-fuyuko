@@ -84,18 +84,47 @@
               }
             ];
           },
-          useCallback(fn) {
-            cursor++;
-            return fn;
-          },
-          useEffect(fn) {
+          /**
+           * Memoized callback: same identity while deps are equal, like React.
+           * Without this every render would hand new function identities to the
+           * effects below, restarting their timers on each render.
+           */
+          useCallback(fn, deps) {
             const i = cursor++;
             const prev = slots[i];
-            slots[i] = { fn, deps: undefined };
+            const same =
+              prev &&
+              Array.isArray(deps) &&
+              Array.isArray(prev.deps) &&
+              deps.length === prev.deps.length &&
+              deps.every((d, k) => Object.is(d, prev.deps[k]));
+            if (same) return prev.fn;
+            slots[i] = { fn, deps: Array.isArray(deps) ? deps.slice() : undefined };
+            return fn;
+          },
+          /**
+           * Effects honour their dependency array, exactly like React: a missing
+           * or changed dep re-runs the effect (after the previous cleanup), and an
+           * unchanged dep array is a no-op. Ignoring deps here would run every
+           * cleanup on every render — which silently cancelled the bubble timer
+           * and made a spoken line stick on screen forever.
+           */
+          useEffect(fn, deps) {
+            const i = cursor++;
+            const prev = slots[i];
+            const prevDeps = prev && prev.deps;
+            const same =
+              Array.isArray(deps) &&
+              Array.isArray(prevDeps) &&
+              deps.length === prevDeps.length &&
+              deps.every((d, k) => Object.is(d, prevDeps[k]));
+            if (same) return;
+            slots[i] = { deps: Array.isArray(deps) ? deps.slice() : undefined, cleanup: null };
+            const record = slots[i];
             queueMicrotask(() => {
-              if (typeof prev === "function") prev();
+              if (prev && typeof prev.cleanup === "function") prev.cleanup();
               const cleanup = fn();
-              slots[i] = typeof cleanup === "function" ? cleanup : null;
+              record.cleanup = typeof cleanup === "function" ? cleanup : null;
             });
           },
           /**
@@ -215,6 +244,16 @@
       window.petActivity = (name) => signal.publishSignal({ activity: name, sessionId: "harness" });
       window.petClear = () => signal.clearSignal();
       window.petSignal = () => signal.getSignal();
+      // M2 persona helpers, for driving the bubble/menu from the console.
+      window.petProbe = () => (window.__petProbe ? window.__petProbe() : null);
+      window.petSetMode = (mode) => {
+        const st = signal.readPetState();
+        st.mode = mode;
+        signal.writePetState(st);
+        // The component reads state at mount; a reload is the honest way to
+        // re-seed it in this harness.
+        return st;
+      };
       // The component fetches pet.json before rendering; report once it appears.
       let tries = 0;
       const timer = setInterval(() => {

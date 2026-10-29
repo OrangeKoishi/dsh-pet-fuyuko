@@ -2,10 +2,10 @@
 
 黛冬优子桌宠 —— DeepSeek Harness Web GUI 的客户端浮层插件。
 
-![preview](docs/preview.png)
+![preview](docs/preview-m2.png)
 
-> 当前状态：**M1（状态联动）已完成** —— 她会跟着真实会话换表情。
-> 报告：[M1-STATUS.md](M1-STATUS.md) · [M0-STATUS.md](M0-STATUS.md)
+> 当前状态：**M2（人格）已完成** —— 她会说话，而且有两种人格。
+> 报告：[M2-STATUS.md](M2-STATUS.md) · [M1-STATUS.md](M1-STATUS.md) · [M0-STATUS.md](M0-STATUS.md)
 > 设计稿：[DESIGN.md](DESIGN.md) · 素材验收：[ASSET-REVIEW.md](ASSET-REVIEW.md)
 
 ## 它现在能做什么
@@ -14,10 +14,13 @@
 - 可拖动，位置记在 `localStorage`，刷新后还在；窗口缩放自动夹回可视区
 - **Alt + 滚轮缩放**（0.5×–2.5×），以脚底中心为锚点，缩放比例也会记住
 - **跟着会话状态换表情**：模型思考时上浮、工具运行时摇摆、报错时抖动
+- **会说话**：130 条台词，圆角气泡 + 小尾巴，跟随宿主亮暗主题
+- **两种人格**：营业（温柔敬语）/ 本体（黑腹吐槽），菜单切换或单击时 10% 随机切
+- **右键菜单**：说话 / 换人格 / 静音 / 隐身 / 重置冷却
+- **`Ctrl+Shift+F`** 隐身，再按一次唤回（只在当前窗口生效）
 - 待机呼吸微动（CSS `transform`，不跑 rAF）；`prefers-reduced-motion` 自动关掉
-- 单击弹一下「慌张」反应；`think` 状态显示三点动画
 - 窗口级常驻：落地页、设置页也在（桌宠属于窗口，不属于某个会话）
-- 素材改完刷新即生效（`pets/` 目录由 host 半边实时服务，不走打包）
+- 素材与台词改完刷新即生效（`pets/` 与 `lines.zh.json` 由 host 半边实时服务）
 
 ### 操作
 
@@ -25,7 +28,11 @@
 |---|---|
 | 拖动 | 移动，松手后记住位置 |
 | **Alt + 滚轮** | 缩放立绘（上滚放大、下滚缩小），右下角短暂显示百分比 |
-| 单击 | 弹一下反应（M2 接台词） |
+| 单击身体 | 说一句台词；10% 几率切换人格 |
+| 单击呆毛 | 呆毛弹一下 + 傲娇台词 |
+| 悬停 | `curious`（探头） |
+| **右键** | 菜单：说话 / 换人格 / 静音 / 隐身 / 重置冷却 |
+| **Ctrl+Shift+F** | 隐身 / 唤回 |
 
 缩放以**脚底中心**为锚点，所以她不会在放大时"飘起来"；碰到窗口边缘时会自动夹回可视区。
 直接滚轮不受影响，仍然是滚动页面/对话。
@@ -40,19 +47,47 @@
 | 上浮 + 三点（think） | 模型正在流式输出 |
 | 左右摇摆（work） | 有工具正在执行 |
 | 抖动（panic） | 这一轮报错了 |
+| 探头（curious） | 鼠标悬停在她身上 |
+| 说话（talk） | 正在说一句台词 |
+| 打盹（sleepy） | 23:00–06:00 且 10 分钟没互动 |
+
+优先级：`drag > talk > panic > sleep > work > think > curious > idle`。
 
 桥接方式：桌宠在 root 作用域的浮层里，`useChat` / `useSession` 只存在于会话作用域，
 两者是不同的 React 树。所以有一个渲染 `null` 的桥接组件挂在 `conversation.input.overlay`，
 把粗粒度活动状态（只有标志位，不含任何消息内容）发布到模块级 store，桌宠订阅它。
 
+### 台词
+
+台词全部在 [`lines.zh.json`](lines.zh.json)，**改完刷新页面即生效**，不用重启也不用重打包。
+
+```json
+{ "id": "click.omote.01", "kind": "click", "mode": "omote", "emotion": "smile",
+  "text": "呀……！突然碰我，会吓到的啦。", "weight": 1, "cooldown": 600 }
+```
+
+| 字段 | 说明 |
+|---|---|
+| `kind` | `idle` / `click` / `ahoge` / `think` / `work` / `panic` / `balance` / `feed` / `festive` |
+| `mode` | `omote`（营业）/ `ura`（本体）/ `both`（通用） |
+| `emotion` | 视觉表情提示 |
+| `weight` | 加权随机（默认 1） |
+| `cooldown` | 这条自己的冷却秒数（默认 600） |
+| `once` | 只播一次（用 `onceSeen` 记账） |
+| `date` / `fromHour` / `toHour` | 节日与时段条件，如 `"12-04"`、`2` |
+
+同一类台词**播完一整轮才会重复**（不是"随机到不重复"，是保证）。
+变量 `{称呼}` `{余额}` `{今日花费}` `{时长}` `{模型}` 会被替换；
+未知占位符会原样保留，方便一眼看出哪条还没接上数据。
+
 ## 目录
 
 ```
-lib/index.js     host 半边：只读静态资源路由 /pet-fuyuko/asset/**
+lib/index.js     host 半边：只读静态资源路由 /pet-fuyuko/asset/** + 台词库白名单路由
 lib/client.js    browser 半边：shell.overlay（PetLayer）+ 会话桥接（SessionBridge）
 pets/fuyuko/     素材：pet.json + fuyuko.png（512×512 透明，脚底锚点）
-lines.zh.json    台词库（120 条，M2 接）
-test/            4 个自测 + 1 个可视化验收台
+lines.zh.json    台词库（130 条，双人格）
+test/            5 个自测 + 1 个可视化验收台
 ```
 
 ## 安装
@@ -87,9 +122,10 @@ npm test
 
 | 测试 | 验什么 |
 |---|---|
-| `asset-route.test.mjs` | 路由注册、MIME、PNG 魔数、目录穿越、405、HEAD |
-| `live-server.test.mjs` | 真的起一个 `node:http`，用 `fetch` 走网络请求，验 512×512 RGBA |
+| `asset-route.test.mjs` | 路由注册、MIME、PNG 魔数、目录穿越、405、HEAD、台词库白名单路由 |
+| `lines.test.mjs` | 台词库结构、双人格隔离、循环不重样、冷却、`once`、节日条件、状态优先级、存档迁移 |
 | `client-face.test.mjs` | bundle 是合法 classic script、插件面、双槽位注册、几何/持久化、缩放数学、状态推导与订阅去重 |
+| `live-server.test.mjs` | 真的起一个 `node:http`，用 `fetch` 走网络请求，验 512×512 RGBA |
 | `packaging.test.mjs` | `file:` URL 能 import、`package.json` 可被向上查找、`exports["./client"]` 有效、bundle 只 require 平台模块 |
 
 可视化验收台（真实浏览器渲染真实 bundle，不需要 DSH 在跑）：
@@ -103,7 +139,8 @@ node test/harness-server.mjs 4599
 
 - 换形象：直接覆盖 `pets/fuyuko/fuyuko.png`（512×512、透明、脚底贴底、水平居中），刷新即可
 - 加表情：放 `pets/fuyuko/fuyuko-<state>.png`，在 `pet.json` 的 `assets.optional` 里加一行
-- 换台词：改 `lines.zh.json`
+- 换台词：改 `lines.zh.json`（刷新即生效，不需要重启）
+- 加一类台词：在 `lines.zh.json` 里加 `kind` 即可，代码不用改
 
 ## 版权
 

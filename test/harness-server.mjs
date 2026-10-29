@@ -31,6 +31,9 @@ const server = createServer((req, res) => {
     file = join(root, "lib", "client.js");
   } else if (url.pathname.startsWith("/pet-fuyuko/asset/")) {
     file = join(root, "pets", url.pathname.slice("/pet-fuyuko/asset/".length));
+  } else if (url.pathname === "/pet-fuyuko/lines.zh.json") {
+    // Mirrors the host half's package-root whitelist route.
+    file = join(root, "lines.zh.json");
   }
 
   if (file === undefined || !existsSync(file) || !statSync(file).isFile()) {
