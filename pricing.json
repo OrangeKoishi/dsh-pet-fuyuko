@@ -1,9 +1,10 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "currency": "CNY",
-  "_readme": "价目表：单位是「元 / 百万 token」。改这里即可，代码不用动。字段：inputCacheMiss（缓存未命中输入）/ inputCacheHit（缓存命中输入）/ output（输出）。未列出的模型在界面上显示「价格未知」，绝不臆造数字。",
+  "_readme": "价目表：单位是「元 / 百万 token」。改这里即可，代码不用动。字段：inputCacheMiss（缓存未命中输入）/ inputCacheHit（缓存命中输入）/ output（输出）。未命中的模型在界面上显示「价格未知」，绝不臆造数字。",
   "_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing （2026-10-29 抓取）",
   "_peakNote": "DeepSeek 官方价格分高峰/空闲两档：北京时间周一至周五（不含法定节假日）09:00-12:00、14:00-18:00 为高峰，其余时段（含周末全天）为空闲，空闲价 = 高峰价的一半。下表 off-peak 字段是官方空闲价，peak 字段是官方高峰价。",
+  "_matchOrder": "匹配顺序：① 精确 id → ② aliases → ③ patterns（从上往下，先匹配先用）→ ④ id 前缀。patterns 是为了兜住各家渠道对同一个模型的不同叫法。",
   "periods": {
     "timezone": "Asia/Shanghai",
     "peak": {
@@ -36,5 +37,22 @@
     "deepseek-reasoner": "deepseek-v4-pro",
     "deepseek-v4-pro-0813": "deepseek-v4-pro"
   },
+  "patterns": [
+    {
+      "match": "^deepseek.*(pro|reasoner)|^deepseek-reasoner",
+      "model": "deepseek-v4-pro",
+      "note": "先判 deepseek 的 pro/reasoner，否则下面 flash 的宽匹配会把 v4-pro 也吃掉。必须锚定 ^deepseek，否则 kimi-k3.1-pro 这类别家模型会被误判成 DeepSeek 价"
+    },
+    {
+      "match": "^deepseek.*(flash|v4)|\\bdeepseek-flash\\b",
+      "model": "deepseek-flash",
+      "note": "deepseek 系里除 pro 之外的都算 flash：v4.1-flash、v4.1-flash-sg、v4-flash-vision-exp、deepseek-flash-1017…"
+    },
+    {
+      "match": "^deepseek",
+      "model": "deepseek-flash",
+      "note": "兜底：任何认不出的 deepseek-* 按 flash 估，宁可略高估也不显示未知（价目表里 flash 是便宜那档）"
+    }
+  ],
   "_disclaimer": "按本地记录的 token × 价目表估算，和账单可能有出入。"
 }

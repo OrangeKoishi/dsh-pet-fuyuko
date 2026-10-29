@@ -5,7 +5,7 @@
 ![preview](docs/preview-m3.png)
 
 > 当前状态：**M3（钱包）已完成** —— 她会报余额，也会算你花了多少。
-> 报告：[M3-STATUS.md](M3-STATUS.md) · [M2-STATUS.md](M2-STATUS.md) · [M1-STATUS.md](M1-STATUS.md) · [M0-STATUS.md](M0-STATUS.md)
+> 报告：[M3.1-STATUS.md](M3.1-STATUS.md)（模型识别修复） · [M3-STATUS.md](M3-STATUS.md) · [M2-STATUS.md](M2-STATUS.md) · [M1-STATUS.md](M1-STATUS.md) · [M0-STATUS.md](M0-STATUS.md)
 > 设计稿：[DESIGN.md](DESIGN.md) · 素材验收：[ASSET-REVIEW.md](ASSET-REVIEW.md)
 
 ## 它现在能做什么
@@ -54,7 +54,14 @@
 查余额是 host 半边代劳的。
 
 价目表按官方**双档**（高峰 / 空闲，空闲价 = 高峰价一半）实现，高峰时段按北京时间判定。
-改 `pricing.json` 即可换价格，代码不用动。
+
+模型名从宿主的 `modelSelection` 投影读（`next` → `lastUsed`），
+再用 `pricing.json` 的 **精确 id → aliases → patterns 正则 → id 前缀** 四层匹配。
+所以官方渠道的 `deepseek-flash`、第三方的 `deepseek-v4.1-flash-sg`、
+显示名 `DeepSeek-V4.1-Flash` 都能落到同一档价；认不出来的（gpt / claude / glm / kimi）
+仍然显示「价格未知」，**不编数字**。
+
+改 `pricing.json` 即可换价格或加模型，代码不用动。
 
 ### 状态联动
 

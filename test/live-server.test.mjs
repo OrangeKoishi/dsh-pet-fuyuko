@@ -7,7 +7,7 @@
  */
 import { strict as assert } from "node:assert";
 import { createServer } from "node:http";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { writeFileSync, unlinkSync, existsSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { apply } from "../lib/index.js";
@@ -154,9 +154,22 @@ try {
   const balance = await r.json();
   assert.equal(typeof balance.ok, "boolean");
   assert.ok(!/sk-/.test(JSON.stringify(balance)), "no key material in the balance payload");
-  // With no key configured it must say so rather than guessing a balance.
-  assert.ok(balance.ok === false, "no key configured in this environment");
-  assert.ok(["nokey", "auth", "network", "timeout", "rate"].includes(balance.code), `code is from the fixed set: ${balance.code}`);
+  // This machine may or may not have a key configured, and the upstream may or
+  // may not be reachable, so assert the *contract* rather than one outcome.
+  if (balance.ok === true) {
+    assert.equal(typeof balance.isAvailable, "boolean");
+    assert.ok(Array.isArray(balance.infos), "a successful read lists balance_infos");
+    assert.equal(typeof balance.fetchedAt, "number");
+    for (const info of balance.infos) {
+      assert.equal(typeof info.currency, "string");
+      assert.ok("total" in info, "each entry carries a total");
+    }
+  } else {
+    assert.ok(
+      ["nokey", "auth", "network", "timeout", "rate", "forbidden"].includes(balance.code),
+      `code is from the fixed set: ${balance.code}`
+    );
+  }
 
   // 14. the balance route is read-only
   r = await fetch(`${base}/pet-fuyuko/balance`, { method: "POST" });
@@ -199,10 +212,45 @@ try {
     }
   }
 
-  // 17. A DELETE on the key endpoint reports the state it can actually verify.
-  r = await fetch(`${base}/pet-fuyuko/key`, { method: "DELETE" });
-  assert.equal(r.status, 200);
-  assert.equal((await r.json()).configured, false);
+  // 17. A DELETE reports the state it can actually verify — and must never run
+  //     against the user's real credential store. Point DSH_HOME at a scratch
+  //     directory so this exercises the route without touching ~/.dsh.
+  {
+    const savedHome = process.env.DSH_HOME;
+    const scratch = join(tmpdir(), `dsh-pet-fuyuko-scratch-${process.pid}`);
+    mkdirSync(scratch, { recursive: true });
+    process.env.DSH_HOME = scratch;
+    try {
+      // Store a key, then clear it, and check both answers.
+      r = await fetch(`${base}/pet-fuyuko/key`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ apiKey: "sk-abcdefgh12345678" })
+      });
+      assert.equal(r.status, 200);
+      assert.equal((await r.json()).configured, true, "a valid key is stored");
+
+      // It really landed on disk, owner-only.
+      const credFile = join(scratch, "pet-fuyuko", "credentials.json");
+      assert.ok(existsSync(credFile), "the credential file exists");
+      if (process.platform !== "win32") {
+        const mode = statSync(credFile).mode & 0o777;
+        assert.equal(mode, 0o600, `credential file must be 0600, got ${mode.toString(8)}`);
+      }
+
+      r = await fetch(`${base}/pet-fuyuko/key`, { method: "DELETE" });
+      assert.equal(r.status, 200);
+      assert.equal((await r.json()).configured, false, "DELETE clears it");
+      r = await fetch(`${base}/pet-fuyuko/key`);
+      assert.equal((await r.json()).configured, false, "and the status agrees");
+    } finally {
+      if (savedHome === undefined) delete process.env.DSH_HOME;
+      else process.env.DSH_HOME = savedHome;
+      try {
+        rmSync(scratch, { recursive: true, force: true });
+      } catch {}
+    }
+  }
 
   console.log("live-server: all checks passed");
 } finally {

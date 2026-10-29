@@ -97,7 +97,7 @@ assert.ok(partial !== null);
 assert.equal(partial.models.size, 1, "the malformed model is dropped");
 assert.ok(partial.models.get("onlyPeak").offPeak, "a single-tier model reuses its tier for both");
 
-// ── 3. model resolution: aliases and case ────────────────────────────────
+// ── 3. model resolution: aliases, patterns, case ────────────────────────
 // The session reports `deepseek-v4.1-flash-sg`; the table names `deepseek-flash`.
 assert.equal(t.resolveModelPricing(pricing, "deepseek-v4.1-flash-sg")?.id, "deepseek-flash");
 assert.equal(t.resolveModelPricing(pricing, "DeepSeek-V4.1-Flash-SG")?.id, "deepseek-flash", "case-insensitive");
@@ -108,6 +108,51 @@ assert.equal(t.resolveModelPricing(pricing, "deepseek-flash-1017")?.id, "deepsee
 assert.equal(t.resolveModelPricing(pricing, "gpt-6-astra"), null);
 assert.equal(t.resolveModelPricing(pricing, ""), null);
 assert.equal(t.resolveModelPricing(null, "deepseek-flash"), null);
+
+// ── 3b. the regex layer catches every channel's naming of the same model ─
+// This is the fix for "价格未知" on real sessions: each provider spells the
+// model differently, and the projection hands us exactly one of these.
+assert.ok(pricing.patterns.length >= 2, "the shipped table declares patterns");
+for (const name of [
+	"deepseek-flash",
+	"deepseek-v4.1-flash",
+	"deepseek-v4.1-flash-sg",
+	"deepseek-v4-flash",
+	"deepseek-v4-flash-vision-exp",
+	"deepseek-v4.1-flash-vision-exp",
+	"deepseek-flash-1017",
+	"DeepSeek-V4.1-Flash",
+	"deepseek-chat"
+]) {
+	assert.equal(t.resolveModelPricing(pricing, name)?.id, "deepseek-flash", `${name} must price as flash`);
+}
+for (const name of ["deepseek-v4-pro", "deepseek-v4-pro-0813", "deepseek-reasoner", "DeepSeek-V4-Pro"]) {
+	assert.equal(t.resolveModelPricing(pricing, name)?.id, "deepseek-v4-pro", `${name} must price as pro`);
+}
+// The pro pattern must win over the broad flash pattern: a name containing
+// both words is a pro model, and mispricing it would understate cost ~4x.
+assert.equal(t.resolveModelPricing(pricing, "deepseek-v4-pro-flash-hybrid")?.id, "deepseek-v4-pro");
+// An unrecognised deepseek-* falls back to flash rather than "unknown".
+assert.equal(t.resolveModelPricing(pricing, "deepseek-something-new")?.id, "deepseek-flash");
+// But a non-DeepSeek model is still never priced.
+for (const name of ["gpt-6-astra", "claude-sonnet-4", "glm-5.3", "kimi-k3.1-pro", "qwen-max"]) {
+	assert.equal(t.resolveModelPricing(pricing, name), null, `${name} has no price entry`);
+}
+
+// A malformed pattern is dropped at load time instead of throwing at render.
+{
+	const bad = t.normalizePricing({
+		models: { a: { peak: { inputCacheMiss: 1, inputCacheHit: 0.1, output: 2 } } },
+		patterns: [
+			{ match: "([", model: "a" },
+			{ match: "ok", model: "missing" },
+			{ match: "ok", model: "a" }
+		]
+	});
+	assert.ok(bad !== null);
+	assert.equal(bad.patterns.length, 1, "only the valid, resolvable pattern survives");
+	assert.equal(t.resolveModelPricing(bad, "ok-model")?.id, "a");
+}
 
 // ── 4. peak-time detection reads Beijing time, not the browser's ─────────
 const peak = rawPricing.periods.peak;
@@ -400,7 +445,34 @@ assert.ok(t.balanceErrorText(undefined).length > 0, "an absent code still says s
 	t.clearSignal();
 }
 
-// ── 14. model attribution from chat nodes ───────────────────────────────
+// ── 14. model attribution ───────────────────────────────────────────────
+// The projection is the real source; the chat-node provenance is a fallback.
+{
+	// modelSelection: `next` wins, `lastUsed` is the documented fallback.
+	assert.deepEqual(
+		t.readSelection({ next: { provider: "p1", model: "m1" }, lastUsed: { provider: "p0", model: "m0" } }),
+		{ provider: "p1", model: "m1" }
+	);
+	assert.deepEqual(
+		t.readSelection({ next: null, lastUsed: { provider: "p0", model: "m0" } }),
+		{ provider: "p0", model: "m0" },
+		"falls back to lastUsed"
+	);
+	// `next` present but model-less must not shadow a usable lastUsed.
+	assert.deepEqual(
+		t.readSelection({ next: { provider: "p1", model: "" }, lastUsed: { provider: "p0", model: "m0" } }),
+		{ provider: "p0", model: "m0" }
+	);
+	assert.deepEqual(t.readSelection(null), { provider: "", model: "" });
+	assert.deepEqual(t.readSelection(undefined), { provider: "", model: "" });
+	assert.deepEqual(t.readSelection({}), { provider: "", model: "" });
+	assert.deepEqual(t.readSelection("junk"), { provider: "", model: "" });
+	// Whitespace-only model ids are treated as absent.
+	assert.deepEqual(t.readSelection({ next: { model: "   " } }), { provider: "", model: "" });
+	// A missing provider does not lose the model.
+	assert.deepEqual(t.readSelection({ next: { model: "m1" } }), { provider: "", model: "m1" });
+}
+
 {
 	const chat = (nodes) => ({ nodes: { values: () => nodes } });
 	const assistant = (seq, model) => ({ seq, provenance: { provider: "p", model } });
@@ -411,6 +483,18 @@ assert.ok(t.balanceErrorText(undefined).length > 0, "an absent code still says s
 	assert.equal(t.deriveModel(undefined), "");
 	assert.equal(t.deriveModel(null), "");
 	assert.equal(t.deriveModel({ nodes: {} }), "", "no values() → empty");
+}
+
+// The regression that caused the reported bug: a real session's assistant
+// messages carry NO provenance, so the projection must be the primary source.
+// This documents why `deriveModel` alone is not enough.
+{
+	const bare = { nodes: { values: () => [{ seq: 1, kind: "assistant" }, { seq: 2, kind: "assistant" }] } };
+	assert.equal(t.deriveModel(bare), "", "assistant nodes without provenance yield nothing");
+	const selection = { next: { provider: "workbuddy-global", model: "deepseek-v4.1-flash" }, lastUsed: null };
+	const route = t.readSelection(selection);
+	assert.equal(route.model, "deepseek-v4.1-flash", "the projection supplies the model");
+	assert.equal(t.resolveModelPricing(pricing, route.model)?.id, "deepseek-flash", "and it prices correctly");
 }
 
 // ── 15. host half: the key never leaves the process ─────────────────────
