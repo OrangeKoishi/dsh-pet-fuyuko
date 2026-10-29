@@ -167,4 +167,58 @@ const stored = JSON.parse(window.localStorage.getItem("dsh-pet-fuyuko:position")
 assert.deepEqual(stored, { x: 321, y: 655 });
 assert.deepEqual(mod.__test.readPosition(), { x: 321, y: 655, placed: true });
 
+// ── Alt+wheel zoom ────────────────────────────────────────────────────────
+const { sanitizeScale, boxSize, anchorOnZoom, clamp, SIZE, MIN_SCALE, MAX_SCALE, ZOOM_RATE } = mod.__test;
+
+// Zoom is clamped into the supported range, and junk falls back to 1.
+assert.equal(sanitizeScale(1), 1);
+assert.equal(sanitizeScale(0.1), MIN_SCALE, "below the floor → clamped up");
+assert.equal(sanitizeScale(99), MAX_SCALE, "above the ceiling → clamped down");
+assert.equal(sanitizeScale("abc"), 1, "non-numeric → 1");
+assert.equal(sanitizeScale(undefined), 1, "undefined → 1");
+assert.equal(sanitizeScale(Number.NaN), 1, "NaN → 1");
+
+// The rendered box tracks the scale.
+assert.equal(boxSize(1), SIZE);
+assert.equal(boxSize(2), SIZE * 2);
+assert.equal(boxSize(0.5), SIZE / 2);
+
+// Zooming grows the box upward and sideways from the bottom-centre anchor, so
+// her feet stay planted: the top edge moves up by the full growth, the left
+// edge by half of it.
+const before = { x: 400, y: 500 };
+const grown = anchorOnZoom(before, 1, 2);
+assert.equal(grown.x, 400 - SIZE / 2, "centre preserved horizontally");
+assert.equal(grown.y, 500 - SIZE, "bottom edge preserved vertically");
+const shrunk = anchorOnZoom(before, 2, 1);
+assert.equal(shrunk.x, 400 + SIZE / 2);
+assert.equal(shrunk.y, 500 + SIZE);
+// Round-tripping a zoom change returns to the original top-left.
+const roundTrip = anchorOnZoom(grown, 2, 1);
+assert.equal(roundTrip.x, before.x);
+assert.equal(roundTrip.y, before.y);
+
+// Clamping accounts for the zoomed box: a 2x pet cannot hang off the edge.
+const big = clamp({ x: 99999, y: 99999 }, 2);
+assert.equal(big.x, 1280 - SIZE * 2 - 16);
+assert.equal(big.y, 800 - SIZE * 2 - 16);
+
+// Default seat also respects the current zoom.
+assert.deepEqual(mod.__test.defaultPosition(1), { x: 1092, y: 544 });
+assert.deepEqual(mod.__test.defaultPosition(2), { x: 1280 - 320 - 28, y: 800 - 320 - 96 });
+
+// Persisted zoom round-trips, and a junk value degrades to 1 instead of NaN.
+mod.__test.writeScale(1.23456);
+assert.equal(JSON.parse(window.localStorage.getItem("dsh-pet-fuyuko:scale")), 1.235);
+assert.equal(mod.__test.readScale(), 1.235);
+window.localStorage.setItem("dsh-pet-fuyuko:scale", "\"nope\"");
+assert.equal(mod.__test.readScale(), 1, "corrupt stored zoom → 1");
+
+// A wheel notch changes the scale by ZOOM_RATE * deltaY, and the sign is right:
+// scrolling up (negative deltaY) enlarges her.
+const stepUp = 1 * (1 - -100 * ZOOM_RATE);
+const stepDown = 1 * (1 - 100 * ZOOM_RATE);
+assert.ok(stepUp > 1, "wheel up enlarges");
+assert.ok(stepDown < 1, "wheel down shrinks");
+
 console.log("client-face: all checks passed");

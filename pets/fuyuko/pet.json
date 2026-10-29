@@ -6,6 +6,12 @@
   "anchor": "bottom-center",
   "canvas": 512,
   "scale": 1,
+  "zoom": {
+    "min": 0.5,
+    "max": 2.5,
+    "default": 1,
+    "gesture": "alt+wheel"
+  },
   "assets": {
     "base": "fuyuko.png",
     "optional": {}
