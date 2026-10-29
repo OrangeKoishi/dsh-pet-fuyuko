@@ -389,12 +389,13 @@ assert.deepEqual(t.readPetState(), fresh, "corrupt blob → defaults");
 	assert.equal(uraMenu.find((i) => i.id === "mode").label, "切换到营业模式");
 	assert.equal(uraMenu.find((i) => i.id === "mute").label, "取消静音");
 
-	// M3/M4 entries are present but disabled, so the menu shape is stable.
-	for (const id of ["balance", "feed"]) {
-		const row = omoteMenu.find((i) => i.id === id);
-		assert.ok(row, `${id} placeholder exists`);
-		assert.equal(row.disabled, true, `${id} is not wired yet`);
-	}
+	// The wallet is live as of M3; feeding stays a placeholder until M4.
+	const walletRow = omoteMenu.find((i) => i.id === "wallet");
+	assert.ok(walletRow, "wallet entry exists");
+	assert.notEqual(walletRow.disabled, true, "the wallet is wired");
+	const feedRow = omoteMenu.find((i) => i.id === "feed");
+	assert.ok(feedRow, "feed placeholder exists");
+	assert.equal(feedRow.disabled, true, "feeding is not wired yet");
 	assert.ok(omoteMenu.some((i) => i.sep === true), "the menu has separators");
 }
 

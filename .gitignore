@@ -10,6 +10,13 @@ edge-profile/
 live-shot.png
 out.png
 
+# Runtime state that must never be committed.
+# The Platform key lives outside the repo (~/.dsh/pet-fuyuko/), but keep these
+# patterns anyway so a stray copy can never be pushed.
+credentials.json
+*.credentials.json
+.pet-fuyuko/
+
 # OS
 Thumbs.db
 .DS_Store

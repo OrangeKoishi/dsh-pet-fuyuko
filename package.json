@@ -1,6 +1,6 @@
 {
   "name": "dsh-pet-fuyuko",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "黛冬优子桌宠 — DeepSeek Harness Web GUI 的客户端浮层插件",
   "type": "module",
@@ -19,7 +19,7 @@
     }
   },
   "scripts": {
-    "test": "node test/asset-route.test.mjs && node test/lines.test.mjs && node test/client-face.test.mjs && node test/live-server.test.mjs && node test/packaging.test.mjs"
+    "test": "node test/asset-route.test.mjs && node test/lines.test.mjs && node test/wallet.test.mjs && node test/client-face.test.mjs && node test/live-server.test.mjs && node test/packaging.test.mjs"
   },
   "keywords": [
     "dsh",

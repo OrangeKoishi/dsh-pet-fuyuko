@@ -7,6 +7,9 @@
  */
 import { strict as assert } from "node:assert";
 import { createServer } from "node:http";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { apply } from "../lib/index.js";
 
 /** Minimal stand-in for @deepseek-ai/dsh-host-webserver's route table. */
@@ -104,6 +107,102 @@ try {
   // 7. the manifest declares the normalized canvas the sprite was built at
   r = await fetch(`${base}/pet-fuyuko/asset/fuyuko/pet.json`);
   assert.equal((await r.json()).canvas, 512);
+
+  // 8. the price table is served, and is a real table
+  r = await fetch(`${base}/pet-fuyuko/pricing.json`);
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get("content-type"), /application\/json/);
+  const pricing = await r.json();
+  assert.ok(pricing.models && Object.keys(pricing.models).length >= 2, "pricing carries models");
+  assert.ok(pricing.periods?.peak, "pricing declares the peak window");
+
+  // 9. the key endpoint reports status without ever returning the value
+  r = await fetch(`${base}/pet-fuyuko/key`);
+  assert.equal(r.status, 200);
+  const keyStatus = await r.json();
+  assert.equal(typeof keyStatus.configured, "boolean");
+  assert.equal(keyStatus.apiKey, undefined, "the key must never appear in a response");
+
+  // 10. writing a malformed key is refused (shape check happens before storage)
+  r = await fetch(`${base}/pet-fuyuko/key`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ apiKey: "not-a-key" })
+  });
+  assert.equal(r.status, 400);
+  assert.equal((await r.json()).code, "format");
+
+  // 11. a non-JSON content type is refused (forces a CORS preflight cross-site)
+  r = await fetch(`${base}/pet-fuyuko/key`, {
+    method: "POST",
+    headers: { "content-type": "text/plain" },
+    body: JSON.stringify({ apiKey: "sk-abcdefgh12345" })
+  });
+  assert.equal(r.status, 415);
+
+  // 12. a cross-origin write is refused
+  r = await fetch(`${base}/pet-fuyuko/key`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: "https://evil.example" },
+    body: JSON.stringify({ apiKey: "sk-abcdefgh12345" })
+  });
+  assert.equal(r.status, 403, "a foreign Origin cannot write the key");
+
+  // 13. the balance route answers with the fixed shape, and never a key
+  r = await fetch(`${base}/pet-fuyuko/balance`);
+  assert.equal(r.status, 200);
+  const balance = await r.json();
+  assert.equal(typeof balance.ok, "boolean");
+  assert.ok(!/sk-/.test(JSON.stringify(balance)), "no key material in the balance payload");
+  // With no key configured it must say so rather than guessing a balance.
+  assert.ok(balance.ok === false, "no key configured in this environment");
+  assert.ok(["nokey", "auth", "network", "timeout", "rate"].includes(balance.code), `code is from the fixed set: ${balance.code}`);
+
+  // 14. the balance route is read-only
+  r = await fetch(`${base}/pet-fuyuko/balance`, { method: "POST" });
+  assert.equal(r.status, 405);
+
+  // 15. a cross-origin balance read is refused (drive-by protection)
+  r = await fetch(`${base}/pet-fuyuko/balance`, { headers: { origin: "https://evil.example" } });
+  assert.equal(r.status, 403);
+
+  // 16. A key write must never take the server down, even when the credential
+  //     directory cannot be created (read-only DSH_HOME, sandbox, full disk).
+  //     This was a real crash: the handler rejected, the process died, and the
+  //     browser saw a dead socket instead of an error.
+  {
+    const savedHome = process.env.DSH_HOME;
+    // A path that cannot be created: an existing FILE used as a directory
+    // component, so mkdir({recursive:true}) fails rather than succeeding.
+    const blocker = join(tmpdir(), `dsh-pet-fuyuko-blocked-${process.pid}`);
+    writeFileSync(blocker, "not a directory");
+    process.env.DSH_HOME = blocker;
+    try {
+      r = await fetch(`${base}/pet-fuyuko/key`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ apiKey: "sk-abcdefgh12345678" })
+      });
+      assert.equal(r.status, 500, "an unstorable key is a 500, not a crash");
+      assert.equal((await r.json()).code, "storage");
+
+      // The server must still be alive and answering.
+      r = await fetch(`${base}/pet-fuyuko/key`);
+      assert.equal(r.status, 200, "the server survived the failed write");
+      assert.equal((await r.json()).configured, false, "nothing was stored");
+    } finally {
+      if (savedHome === undefined) delete process.env.DSH_HOME;
+      else process.env.DSH_HOME = savedHome;
+      try {
+        unlinkSync(blocker);
+      } catch {}
+    }
+  }
+
+  // 17. A DELETE on the key endpoint reports the state it can actually verify.
+  r = await fetch(`${base}/pet-fuyuko/key`, { method: "DELETE" });
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).configured, false);
 
   console.log("live-server: all checks passed");
 } finally {

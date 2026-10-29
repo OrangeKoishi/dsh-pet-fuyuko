@@ -180,7 +180,14 @@
             if (k === "style" && typeof v === "object") applyStyle(el, v);
             else if (k === "className") el.className = v;
             else if (k === "ref") v.current = el;
-            else if (k.startsWith("on") && typeof v === "function") el.addEventListener(k.slice(2).toLowerCase(), v);
+            else if (k.startsWith("on") && typeof v === "function") {
+              const event = k.slice(2).toLowerCase();
+              el.addEventListener(event, v);
+              // React's onChange for text inputs is really the `input` event, not
+              // the native `change` (which only fires on blur). Mapping only
+              // `change` made controlled inputs look frozen in this harness.
+              if (event === "change") el.addEventListener("input", v);
+            }
             else if (k === "draggable") el.draggable = !!v;
             else el.setAttribute(k, v === true ? "" : String(v));
           }

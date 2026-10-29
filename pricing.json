@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "currency": "CNY",
+  "_readme": "价目表：单位是「元 / 百万 token」。改这里即可，代码不用动。字段：inputCacheMiss（缓存未命中输入）/ inputCacheHit（缓存命中输入）/ output（输出）。未列出的模型在界面上显示「价格未知」，绝不臆造数字。",
+  "_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing （2026-10-29 抓取）",
+  "_peakNote": "DeepSeek 官方价格分高峰/空闲两档：北京时间周一至周五（不含法定节假日）09:00-12:00、14:00-18:00 为高峰，其余时段（含周末全天）为空闲，空闲价 = 高峰价的一半。下表 off-peak 字段是官方空闲价，peak 字段是官方高峰价。",
+  "periods": {
+    "timezone": "Asia/Shanghai",
+    "peak": {
+      "weekdays": [1, 2, 3, 4, 5],
+      "ranges": [
+        ["09:00", "12:00"],
+        ["14:00", "18:00"]
+      ]
+    }
+  },
+  "models": {
+    "deepseek-flash": {
+      "label": "DeepSeek-V4.1-Flash",
+      "peak": { "inputCacheMiss": 2, "inputCacheHit": 0.04, "output": 8 },
+      "offPeak": { "inputCacheMiss": 1, "inputCacheHit": 0.02, "output": 4 }
+    },
+    "deepseek-v4-pro": {
+      "label": "DeepSeek-V4-Pro",
+      "peak": { "inputCacheMiss": 9, "inputCacheHit": 0.3, "output": 27 },
+      "offPeak": { "inputCacheMiss": 4.5, "inputCacheHit": 0.15, "output": 13.5 }
+    }
+  },
+  "aliases": {
+    "deepseek-v4.1-flash": "deepseek-flash",
+    "deepseek-v4.1-flash-sg": "deepseek-flash",
+    "deepseek-v4-flash": "deepseek-flash",
+    "deepseek-v4-flash-vision-exp": "deepseek-flash",
+    "deepseek-v4.1-flash-vision-exp": "deepseek-flash",
+    "deepseek-chat": "deepseek-flash",
+    "deepseek-reasoner": "deepseek-v4-pro",
+    "deepseek-v4-pro-0813": "deepseek-v4-pro"
+  },
+  "_disclaimer": "按本地记录的 token × 价目表估算，和账单可能有出入。"
+}
